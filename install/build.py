@@ -185,7 +185,7 @@ class ModifiedJavaProject(object):
             
         return decompiled_code_filename
     
-    def make_constructor_accessible(self, class_pathspec, show_differences=True):
+    def make_constructor_accessible(self, class_pathspec, show_differences):
         """
         Decompile the source for the given class and make the default (class Foo()) constructor accessible
         @param class_pathspec: fully qualified class file specifier using forward slash as the separator and ending with ".class"
@@ -243,7 +243,7 @@ class ModifiedJavaProject(object):
     def get_class_fully_qualified_name(self, class_pathspec):
         return desuffix(class_pathspec, ".class").replace("/", ".")
             
-    def replace_constructed_object(self, class_pathspec, original_constructed_pathspec, new_constructed_pathspec):
+    def replace_constructed_object(self, class_pathspec, original_constructed_pathspec, new_constructed_pathspec, show_differences):
         """ Decompile the given class and replace calls to construct one class of object
         with calls to construct another class of object
         @param class_pathspec: fully qualified class file specifier using forward slash as the separator and ending with ".class"
@@ -282,9 +282,9 @@ class ModifiedJavaProject(object):
             
         assert some_match, "no matching constructor calls found"
         
-        self.common_finish_contents(class_pathspec, source_code, decompiled_code_filename)
+        self.common_finish_contents(class_pathspec, source_code, decompiled_code_filename, show_differences)
         
-    def make_methods_accessible(self, class_pathspec, method_specs_list):
+    def make_methods_accessible(self, class_pathspec, method_specs_list, show_differences):
         """
         Decompile the source for the given class and make the given methods visible
         @param method_specs_list: a list of specifiers for methods to make visible, 
@@ -304,16 +304,17 @@ class ModifiedJavaProject(object):
         for method_spec in method_specs_list:
             source_code = source_code.replace("private %s(" % method_spec, "protected %s(" % method_spec)
         
-        self.common_finish_contents(class_pathspec, source_code, decompiled_code_filename)
+        self.common_finish_contents(class_pathspec, source_code, decompiled_code_filename, show_differences)
         
-    def common_finish_contents(self, class_pathspec, source_code_str, decompiled_code_filename):
+    def common_finish_contents(self, class_pathspec, source_code_str, decompiled_code_filename, show_differences):
         new_filename = self.additional_src_filename(class_pathspec)
 
         print("replacing " + new_filename)
         self.decompiler.ensure_file_dir_exists(new_filename)
         write_contents(new_filename, source_code_str.encode("utf-8"))
-        
-        diff_u(decompiled_code_filename, new_filename)
+
+        if show_differences:        
+            diff_u(decompiled_code_filename, new_filename)
         
 
 def get_java_bin_path(program):
@@ -375,6 +376,7 @@ def create_mod_jar(output_jar_filename, classpath_dirs, main_class):
 def parse_args():
     parser = argparse.ArgumentParser("get_sources")
     parser.add_argument("mewnbase_directory", help="The directory containing the original mewnbase game")
+    parser.add_argument("--show_differences", default=False, action="store_true", help="Show differences of the patched decompiled class source; requires a diff tool")
     
     return parser.parse_args()
 
@@ -398,6 +400,8 @@ def main():
     extracted_classpath_dir = os.path.join(script_path, "extracted_jar")
     if not os.path.isdir(extracted_classpath_dir):
         os.mkdir(extracted_classpath_dir)
+        
+    show_differences = options.show_differences
     
     # FIXME dynamically determine the existing game location to use
     mewnbase_dir = options.mewnbase_directory
@@ -425,13 +429,14 @@ def main():
     for class_pathspec in ["com/cairn4/moonbase/tiles/TileFactory.class",
                            "com/cairn4/moonbase/ItemFactory.class"]:
         
-        modifiedGame.make_constructor_accessible(class_pathspec)
+        modifiedGame.make_constructor_accessible(class_pathspec, show_differences)
     
     # replacement classes
-    modifiedGame.replace_constructed_object("com/cairn4/moonbase/ui/GameScreen.class", "com/cairn4/moonbase/GameLoader.class", "net/rakslice/mewnbase_mod/AltGameLoader.class")
+    modifiedGame.replace_constructed_object("com/cairn4/moonbase/ui/GameScreen.class", "com/cairn4/moonbase/GameLoader.class", "net/rakslice/mewnbase_mod/AltGameLoader.class",
+                                            show_differences)
     
     # method visibility 
-    modifiedGame.make_methods_accessible("com/cairn4/moonbase/GameLoader.class", ["void loadEntities"])
+    modifiedGame.make_methods_accessible("com/cairn4/moonbase/GameLoader.class", ["void loadEntities"], show_differences)
     
     # # For getting a diff for our own hand-modified file we would do something like
     # class_pathspec = "com/cairn4/moonbase/entities/Buggie.class"
