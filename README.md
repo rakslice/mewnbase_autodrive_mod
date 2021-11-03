@@ -6,7 +6,7 @@ It replaces the Buggie's special (handbrake) with an auto-drive feature that fol
 
 <kbd>Space</kbd> - Turn on/off auto-drive
 
-Auto-drive will turn off automatically turn off when it runs out of striped pavement to follow.
+Auto-drive will turn off automatically when it runs out of striped pavement to follow.
 
 ## Building ##
 
